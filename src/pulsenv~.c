@@ -15,23 +15,16 @@ typedef struct _pulsenv {
   int x_in_env;
 
   int x_attack_ms;
-  int x_attack_phase;
   int x_in_attack;
-  t_float x_attack_recip;
 
   int x_release_ms;
-  int x_release_phase;
   int x_in_release;
-  int x_release_recip;
-
-  t_float x_attack_curve;
-  t_float x_release_curve;
 
   t_float x_target;
   t_float x_attack_coeff;
   t_float x_release_coeff;
 
-  t_float x_env;
+  t_sample x_env;
 
   t_float x_samps_per_ms;
 } t_pulsenv;
@@ -50,17 +43,10 @@ static void *pulsenv_new(void) {
   x->x_in_env = 0;
   
   x->x_attack_ms = (int)30;
-  x->x_attack_phase = (int)0;
   x->x_in_attack = (int)0;
-  x->x_attack_recip = (t_float)0.0;
 
   x->x_release_ms = (int)100;
-  x->x_release_phase = (int)0;
   x->x_in_release = (int)0;
-  x->x_release_recip = (t_float)0.0;
-
-  x->x_attack_curve = (t_float)2.0;
-  x->x_release_curve = (t_float)0.5;
 
   x->x_samps_per_ms = (t_float)0.0;
 
@@ -68,7 +54,7 @@ static void *pulsenv_new(void) {
   x->x_attack_coeff = (t_float)0.01;
   x->x_release_coeff = (t_float)0.001;
 
-  x->x_env = (t_float)0.0;
+  x->x_env = (t_sample)0.0;
 
   x->x_f = 0;
 
@@ -87,68 +73,47 @@ static t_int *pulsenv_perform(t_int *w) {
   t_sample prev = x->x_previous;
   t_float threshold = x->x_threshold;
   int in_env = x->x_in_env;
-  t_sample env = (t_sample)0.0;
 
-  int attack_phase = x->x_attack_phase;
   int in_attack = x->x_in_attack;
   int attack_samps = (int)(samps_per_ms * x->x_attack_ms);
-  t_float attack_recip = (t_float)((t_float)1.0 / attack_samps);
 
-  int release_phase = x->x_release_phase;
   int in_release = x->x_in_release;
   int release_samps = (int)(samps_per_ms * x->x_release_ms);
-  t_float release_recip = (t_float)((t_float)1.0 / release_samps);
 
-  t_float attack_curve = x->x_attack_curve;
-  t_float release_curve = x->x_release_curve;
+  t_float target = x->x_target;
+  t_sample env = x->x_env;
+  t_float attack_coeff = x->x_attack_coeff;
+  t_float release_coeff = x->x_release_coeff;
 
   for (i = 0; i < n; i++, in1++) {
-    if (!in_attack && !in_release) {
-      t_sample next = *in1;
-      if (next - prev > threshold) {
-        in_env = 1;
-        in_attack = 1;
-      } else if (prev - next > threshold) {
-        in_env = 0;
-        in_release = 1;
-      }
-      prev = next;
+    t_sample next = *in1;
+    if (next - prev > threshold) {
+      in_env = 1;
+      in_attack = 1;
+      target = (t_float)1.0;
+
+    } else if (prev - next > threshold) {
+      in_env = 0;
+      in_release = 1;
+      target = (t_float)0.0;
     }
 
-    if (in_env) {
-      if (in_attack) {
-        // todo: use a 1 pole envelope instead of the pow function
-        t_float linear_pos = (t_float)(attack_phase * attack_recip);
-        env = (t_sample)pow(linear_pos, attack_curve);
-        attack_phase++;
-        if (attack_phase >= attack_samps) {
-          attack_phase = 0;
-          in_attack = 0;
-        }
-      } else {
-        env = (t_sample)1.0;
-      }
-    }
+    t_float coeff = (target > env) ? attack_coeff : release_coeff;
 
-    if (in_release) {
-      t_float linear_pos = (t_float)((release_samps - release_phase) * release_recip);
-      env = (t_sample)pow(linear_pos, release_curve);
-      release_phase++;
-      if (release_phase >= release_samps) {
-        release_phase = 0;
-        in_release = 0;
-      }
-    }
+    env += coeff * (target - env);
 
     *out++ = env;
+    prev = next;
   }
+
+  x->x_target = target;
+  x->x_env = env;
+
   x->x_previous = prev;
   x->x_in_env = in_env;
 
-  x->x_attack_phase = attack_phase;
   x->x_in_attack = in_attack;
 
-  x->x_release_phase = release_phase;
   x->x_in_release = in_release;
 
   return (w+5);
@@ -169,16 +134,8 @@ static void set_attack_ms(t_pulsenv *x, t_floatarg f) {
   x->x_attack_ms = (f > 0) ? f : 0;
 }
 
-static void set_attack_curve(t_pulsenv *x, t_floatarg f) {
-  x->x_attack_curve = (f > 0) ? f : 0;
-}
-
 static void set_release_ms(t_pulsenv *x, t_floatarg f) {
   x->x_release_ms = (f > 0) ? f : 0;
-}
-
-static void set_release_curve(t_pulsenv *x, t_floatarg f) {
-  x->x_release_curve = (f > 0) ? f : 0;
 }
 
 void pulsenv_tilde_setup(void) {
@@ -191,7 +148,5 @@ void pulsenv_tilde_setup(void) {
   class_addmethod(pulsenv_class, (t_method)set_threshold, gensym("threshold"), A_FLOAT, 0);
   class_addmethod(pulsenv_class, (t_method)set_attack_ms, gensym("attack"), A_FLOAT, 0);
   class_addmethod(pulsenv_class, (t_method)set_release_ms, gensym("release"), A_FLOAT, 0);
-  class_addmethod(pulsenv_class, (t_method)set_attack_curve, gensym("attack_curve"), A_FLOAT, 0);
-  class_addmethod(pulsenv_class, (t_method)set_release_curve, gensym("release_curve"), A_FLOAT, 0);
   CLASS_MAINSIGNALIN(pulsenv_class, t_pulsenv, x_f);
 }
