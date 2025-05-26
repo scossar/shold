@@ -138,18 +138,29 @@ static void set_threshold(t_pulsenv *x, t_floatarg f) {
   x->x_threshold = f;
 }
 
-// attack in seconds
+// attack in (approx) seconds
 static void set_attack_coefficient(t_pulsenv *x, t_floatarg f) {
   t_float sr = sys_getsr();
   t_float coeff = (t_float)1.0 - expf((t_float)-1.0 / (sr * f));
   x->x_attack_coeff = coeff;
 }
 
-// release in seconds
+// release in (approx) seconds
 static void set_release_coefficient(t_pulsenv *x, t_floatarg f) {
   t_float sr = sys_getsr();
   t_float coeff = (t_float)1.0 - expf((t_float)-1.0 / (sr * f));
   x->x_release_coeff = coeff;
+}
+//
+// decay in (approx) seconds
+static void set_decay_coefficient(t_pulsenv *x, t_floatarg f) {
+  t_float sr = sys_getsr();
+  t_float coeff = (t_float)1.0 - expf((t_float)-1.0 / (sr * f));
+  x->x_decay_coeff = coeff;
+}
+
+static void set_sustain_level(t_pulsenv *x, t_floatarg f) {
+  x->x_sustain_level = f;
 }
 
 void pulsenv_tilde_setup(void) {
@@ -162,5 +173,7 @@ void pulsenv_tilde_setup(void) {
   class_addmethod(pulsenv_class, (t_method)set_threshold, gensym("threshold"), A_FLOAT, 0);
   class_addmethod(pulsenv_class, (t_method)set_attack_coefficient, gensym("attack"), A_FLOAT, 0);
   class_addmethod(pulsenv_class, (t_method)set_release_coefficient, gensym("release"), A_FLOAT, 0);
+  class_addmethod(pulsenv_class, (t_method)set_decay_coefficient, gensym("decay"), A_FLOAT, 0);
+  class_addmethod(pulsenv_class, (t_method)set_sustain_level, gensym("sustain"), A_FLOAT, 0);
   CLASS_MAINSIGNALIN(pulsenv_class, t_pulsenv, x_f);
 }
