@@ -1,6 +1,6 @@
-lib.name = simple-del
+lib.name = sample_and_hold
 
-class.sources = src/simple_delwrite~.c src/simple_delread~.c src/delay~.c src/delay1~.c src/delay1_cubic~.c src/delay2~.c src/multitap~.c src/stereotaps~.c
+class.sources = src/shold~.c src/sshot~.c src/penv~.c src/pulsenv~.c
 
 PDLIBBUILDER_DIR=pd-lib-builder/
 include ${PDLIBBUILDER_DIR}/Makefile.pdlibbuilder
